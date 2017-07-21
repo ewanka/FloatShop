@@ -1,104 +1,61 @@
 <?php
-require_once("../MySQLConnection.php");
 
-Class Customer
+class User
 {
-    private $id;
-    private $name;
-    private $surname;
+
+    private $id = -1; //by odróżnić od już istniejących w bazie danych
+    private $username;
     private $email;
-    private $password;
-    private $password_confirmation;
-    private $address;
-    private $postalCode;
-    private $city;
+    private $hashPass;
 
     public function __construct()
     {
-
+        $this->username = '';
+        $this->email = '';
+        $this->hashPass = '';
     }
 
-    public function getId(){return $this->id;}
-    public function getName(){return $this->name;}
-    public function getSurname(){return $this->surname;}
-    public function getEmail(){return $this->email;}
-    public function getPassword(){return $this->password;}
-    public function getAddress(){return $this->address;}
-    public function getPostalCode(){return $this->postalCode;}
-    public function getCity(){return $this->city;}
-
-    public function setName($name)
+    function getId()
     {
-        $this->name = $name;
+        return $this->id;
     }
 
-    public function setSurname($surname)
+    function getUsername()
     {
-        $this->surname = $surname;
+        return $this->username;
     }
 
-    public function setEmail($email)
+    function getEmail()
     {
-//        $result = $conn->query("SELECT * FROM Customers WHERE email=$email");
-
-        return false;
-
-//        if ($result = true) {
-//            return true;
-//        } else {
-//            $this->email = $email;
-//        }
+        return $this->email;
     }
 
-    private function setPassword($password)
+    function setUsername($username)
     {
-        $this->password = password_hash($password, PASSWORD_BCRYPT);
+        $this->username = $username;
     }
 
-    private function setAddress($address)
+    function setEmail($email)
     {
-        $this->address = $address;
+        $this->email = $email;
     }
 
-    private function setPostalCode($postalCode)
+    public function setPassword(string $password)
     {
-        $this->postalCode = $postalCode;
+        $this->hashPass = password_hash($password, PASSWORD_BCRYPT);
     }
 
-    private function setCity($city)
+    public function saveToDb(PDO $conn)   //type hinting - $conn to obiekt klasy PDO,
     {
-        $this->city = $city;
-    }
-
-
-
-//    Ewa    ///////////////////////////////////////////////////////////////
-
-
-
-    protected function showHistoryOfOrders(PDO $conn)
-    {
-        $orders = [];
-        $result = $conn->query("SELECT * FROM customers JOIN orders
-            ON customers.customer_id=orders.customer_id"); //join where customer_id = ?
-    }
-    
-    public function saveToDB(PDO $conn)
-    {
-         if ($this->id == -1) { //
-            $sql = "INSERT INTO customers (name, surname, email, password, address, postalCode, city) VALUES (:name, :surname :email, :password, :address, :postalCode, :city)";
+        if ($this->id == -1) { //
+            $sql = "INSERT INTO User (username, email, hash_pass) VALUES (:username, :email, :hash_pass)";
 
             $stmt = $conn->prepare($sql);
 
             $stmt->execute([
-                ':name' => $this->name,
-                ':surname'=> $this->surname,
+                ':username' => $this->username,
                 ':email' => $this->email,
-                ':password' => $this->password,
-                ':address'=> $this->address,
-                ':postalCode'=> $this->postalCode,
-                ':city'=> $this->city
-                    
+                ':hash_pass' => $this->hashPass,
             ]);
 
             $this->id = $conn->lastInsertId();
@@ -106,48 +63,85 @@ Class Customer
             return true;
         }
         else {
-            
-            $sql = "UPDATE customers SET name=:name, surname=:surname, email=:email,
-                    password=:password, address=:address, potalCode=:postalCode, city=:city WHERE id=:id";
+            //ustaw UPDATE
+            $sql = "UPDATE User SET username=:username, email=:email, hash_pass=:hash_pass WHERE id=:id";
 
             $stmt = $conn->prepare($sql);
 
             return $stmt->execute([
-                        ':name' => $this->name,
-                        ':surname'=> $this->surname,
-                        ':email' => $this->email,
-                        ':password' => $this->password,
-                        ':address'=> $this->address,
-                        ':postalCode'=> $this->postalCode,
-                        ':city'=> $this->city,
-                        ':id' => $this->id
+                ':username' => $this->username,
+                ':email' => $this->email,
+                ':hash_pass' => $this->hashPass,
+                ':id' => $this->id,
             ]);
         }
     }
 
-    
-
-    private function login($password, $email)
+    public static function loadUserById(PDO $conn, int $id)
     {
-        connectDB();
-        if ($_POST === ['REQUEST_METHOD']) {
+        $sql = "SELECT * FROM User WHERE id = :id";
+        $stmt = $conn->prepare($sql);
+        $result = $stmt->execute(['id' => $id]);
 
-            if (!isset($_POST['password']) && !isset($_POST['username'])) {
-                echo 'Enter proper username and password';
-                
-                return false;
-            } else {
-                
-                $dbPassword = "SELECT id FROM customers";
-                $dbUsername;
-                
-                if (($_POST['password'] === $dbPassword) && ($_POST['username'] === $dbUsername)) {
-                    echo 'Logged in'; // przekierowanie do strony...?
-                    
-                    return true;
-                }
+        if ($result && $stmt->rowCount() == 1) {
+            $userData = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            $user = new User();
+
+            $user->id = $userData['id'];
+            $user->username = $userData ['username'];
+            $user->email = $userData['email'];
+            $user->hashPass = $userData ['hash_pass'];
+
+            return $user;
+        }
+        else {
+            return null;
+        }
+    }
+
+    public static function loadAllUsers(PDO $conn)
+    {
+        $sql = "SELECT * FROM User ORDER BY id ASC";
+
+        $result = $conn->query($sql);
+
+        if ($result && $result->rowCount() > 0) {
+            foreach ($result->fetchAll(PDO::FETCH_ASSOC) as $userData) {
+                $user = new User();
+
+                $user->id = $userData['id'];
+                $user->username = $userData ['username'];
+                $user->email = $userData['email'];
+                $user->hashPass = $userData ['hash_pass'];
+
+                $users[] = $user;
             }
         }
+
+        return $users;
+    }
+
+    public function isNew(): bool
+    {
+        return $this->id == -1;
+    }
+
+    public function delete(PDO $conn) : bool
+    {
+        if (!$this->isNew()) {
+            $sql = "DELETE FROM User WHERE id=:id";
+
+            $stmt = $conn->prepare($sql);
+
+            if ($stmt->execute(['id' => $this->id])) {
+                $this->id = -1;
+
+                return true;
+            }
+        }
+
+        return false;
     }
 
 }
