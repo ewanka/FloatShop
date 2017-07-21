@@ -1,6 +1,6 @@
 <?php
 
-class User
+class Customer
 {
 
     private $id = -1; //by odróżnić od już istniejących w bazie danych
